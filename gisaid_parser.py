@@ -29,6 +29,7 @@ class GISAID:
 
 	def _get_to_covid_records_main_page(self,wait_time):
 		""" navigate to the covid-19 records page """
+		#self.browser.execute_script("sys.call('c_q83p7x_bb','Go',new Object({'page':'corona2020'}));")
 		self.browser.is_text_present('Browse',wait_time=wait_time)
 		self.browser.find_by_value('Browse').click()
 
@@ -88,6 +89,17 @@ class GISAID:
 		except:
 			return False
 
+	def process_records_for_all_pages(self,sleep_time=2):
+		""" get the html files for records for all pages, assuming a start at page 1 """
+		more_pages = True
+		next_page = 2
+		while more_pages:
+			time.sleep(sleep_time)
+			print('page',next_page - 1)
+			self.process_records_for_current_page()
+			more_pages = self.navigate_to_page(next_page)
+			next_page += 1
+
 	def fill_date_form_field(self,field_id,date):
 		""" given a field_id and date object, fill out a date form field in the main records page 
 		with a date in the format YYYY-MM-DD """
@@ -96,6 +108,8 @@ class GISAID:
 			return False
 		datestring = date.strftime('%Y-%m-%d')
 		form_elem.first.fill(datestring)
+		## click somewhere else to return focus to the records page
+		self.browser.find_by_value('Search').first.click()
 		return True
 		
 class GRec:
@@ -112,13 +126,6 @@ class GRec:
 
 if __name__ == "__main__":
 	g = GISAID(False)
-	#g.process_records_for_current_page()
-	#more_pages = True
-	#next_page = 2
-	#while more_pages:	
-	#	time.sleep(2)
-	#	more_pages = g.navigate_to_page(next_page)
-	#	next_page += 1
 	date = date(2020,3,15)
 	g.fill_date_form_field(g.form_field_id_dict['submission_date_from'],date)
 	time.sleep(2)
