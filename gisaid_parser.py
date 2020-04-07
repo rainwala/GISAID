@@ -1,4 +1,5 @@
 from splinter import Browser
+from gisaid_record import GRec
 import time
 from datetime import date
 from bs4 import BeautifulSoup
@@ -42,46 +43,48 @@ class GISAID:
 		divs = self.browser.find_by_css('td[headers="yui-dt0-th-e "] > div[class="yui-dt-liner"]')
 		return divs
 
-	def _write_record_html_from_div_list(self,div_list,sleep_time):
-		""" for each record div in the div list, get the html, and return a dict of record ID : html """
+	def _write_record_from_div_list(self,div_list,sleep_time):
+		""" for each record div in the div list, get the html, convert to json, and write the html and json """
 		curr_div = 0
 		record_html_dict = {}
 		while curr_div < len(div_list):
 			d = div_list[curr_div]
-			try:
-				d.click()
-				time.sleep(sleep_time)
-			## we need this exception here as it signifies that the frame html has been generated
-			## (it is triggered when splinter tries to click on the next div behind the frame)
-			except:
-				time.sleep(sleep_time)
-				## this next try catch block is for when the iframe hasn't loaded yet
+			while True:
 				try:
-					frame_elem = self.browser.find_by_css('iframe').first	
+					d.click()
+					time.sleep(sleep_time)
+				## we need this exception here as it signifies that the frame html has been generated
+				## (it is triggered when splinter tries to click on the next div behind the frame)
 				except:
-					continue
-				## switch the context to the frame
-				with self.browser.get_iframe(frame_elem) as frame:
-					tds = frame.find_by_css('td')
-					record_id = None
-					for td in tds:
-						if 'EPI_' in td.value:
-							record_id = td.value
-					if record_id is not None:
-						print(record_id)
-						html = frame.find_by_css('html').first.html
-						## write the record via a GRec object
-						gr = GRec(record_id,html)
-						gr.write_html_to_outfile()
-						gr.write_data_to_json_outfile()
-					curr_div += 1
-					frame.find_by_css('img[src="/epi3/app_entities/entities/icons/24x24/navigate_left.png"]').first.click()
+					time.sleep(sleep_time)
+					## this next try catch block is for when the iframe hasn't loaded yet
+					try:
+						frame_elem = self.browser.find_by_css('iframe').first	
+					except:
+						continue
+					## switch the context to the frame
+					with self.browser.get_iframe(frame_elem) as frame:
+						tds = frame.find_by_css('td')
+						record_id = None
+						for td in tds:
+							if 'EPI_' in td.value:
+								record_id = td.value
+						if record_id is not None:
+							print(record_id)
+							html = frame.find_by_css('html').first.html
+							## write the record via a GRec object
+							gr = GRec(record_id,html)
+							gr.write_html_to_outfile()
+							gr.write_data_to_json_outfile()
+						curr_div += 1
+						frame.find_by_css('img[src="/epi3/app_entities/entities/icons/24x24/navigate_left.png"]').first.click()
+						break
 
 	def process_records_for_current_page(self):
 		""" wrapper for the above methods to get parsed output file for each record from the current records page """
 		div_list = self._get_record_div_list_from_current_page(5)
 		print(f'{len(div_list)} records in this page')
-		self._write_record_html_from_div_list(div_list,1)
+		self._write_record_from_div_list(div_list,2)
 
 	def navigate_to_page(self,page_num):
 		""" load the given page of records """
@@ -123,49 +126,7 @@ class GISAID:
 		self.browser.find_by_value('Search').first.click()
 		return True
 		
-class GRec:
-	""" data structures and methods to deal with individual records parsed from GISAID """
-	def __init__(self,record_id,html):
-		self.record_id = record_id
-		self.html = html
-		self.data = self.parse_html()
-
-	def write_html_to_outfile(self):
-		""" write the record to the given outfile """
-		outfile = self.record_id + ".html"
-		with open(outfile,'w') as o:
-			o.write(self.html)
-
-	def _parse_record_html_tr_tag_to_key_value_pair(self,tr_tag):
-		""" take a tr tag from the record and return a key value pair if found otherwise None """
-		tds = [x.text for x in list(tr_tag.children) if x != '\n']
-		if (len(tds) != 2) or (':' not in tds[0]):
-			return None
-		tds[0] = tds[0].rstrip(':')
-		return tds
-
-	def parse_html(self):
-		""" parse the html from a GISAID record into a data dict """
-		soup = BeautifulSoup(self.html, 'html.parser')
-		trs = soup.find_all('tr')
-		data = {}
-		for tr in trs:
-			result = self._parse_record_html_tr_tag_to_key_value_pair(tr)
-			if result is not None:
-				data[result[0]] = result[1]
-		fasta = soup.find_all('pre')[0].text.replace('\n','')
-		fasta = re.sub(r'\s+$',r'',fasta)
-		fasta = re.sub(r'^\s+',r'',fasta)
-		fasta = re.sub(r'^(>.+EPI.+\d+)',r'\1\n',fasta)
-		data['Fasta'] = fasta	
-		return data
-
-	def write_data_to_json_outfile(self):
-		""" writes this object's data dict to a json outfile """
-		outfile = self.record_id + '.json'
-		with open(outfile,'w') as o:
-			json.dump(self.data,o)
-
+		
 if __name__ == "__main__":
 	g = GISAID(True)
 	date = date(2020,2,1)
