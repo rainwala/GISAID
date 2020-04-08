@@ -57,7 +57,7 @@ class GAlign:
 	""" methods and data structures to perform alignments between a GRec fasta and the covid-19 
 	genome sequence, and to produce vcf files from the alignment """
 
-	def __init__(self,reference_fasta_filepath):
+	def __init__(self,reference_fasta_filepath="/home/aawan/SHARED/COVID-19/REF/NC_045512.fa"):
 		self.reference = SeqIO.read(reference_fasta_filepath, "fasta") 
 		self.reference_fasta_filepath = reference_fasta_filepath
 
@@ -188,8 +188,6 @@ class AlnToVCF:
 				del(consolidated[sorted_pos[i+1]])
 				consolidation = True
 				break
-		for pos in sorted(consolidated):
-			print(pos,consolidated[pos])
 		return consolidated				 
 				
 
