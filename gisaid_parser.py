@@ -33,7 +33,6 @@ class GISAID:
 
 	def _get_to_covid_records_main_page(self,wait_time):
 		""" navigate to the covid-19 records page """
-		#self.browser.execute_script("sys.call('c_q83p7x_bb','Go',new Object({'page':'corona2020'}));")
 		self.browser.is_text_present('Browse',wait_time=wait_time)
 		self.browser.find_by_value('Browse').click()
 
@@ -42,6 +41,35 @@ class GISAID:
 		self.browser.is_text_present('yui-dt-rec yui-dt-last yui-dt-even', wait_time=wait_time)
 		divs = self.browser.find_by_css('td[headers="yui-dt0-th-e "] > div[class="yui-dt-liner"]')
 		return divs
+
+	def _check_for_captcha(self,frame,sleep_time):
+		""" within a frame context, test to see if the frame is the capctcha pop-up, 
+		and if so, prompt for user input to enter the captcha """
+		input_elems = frame.find_by_css('input[maxlength="64"]')
+		if len(input_elems) == 0:
+			return False
+		## output the captcha image url 
+		image_url = self._get_captcha_image_url(frame)
+		with open('image_urls','a') as i:
+			i.write(image_url + "\n")
+		print(f'The image url is: {image_url}')
+		print("I await your command :)")
+		captcha = input()
+		print(f'You entered: {captcha}')
+		input_elems.first.fill(captcha)
+		time.sleep(sleep_time)
+		ok_elem = frame.find_by_value('OK').first
+		ok_elem.click()
+		time.sleep(sleep_time)
+		return True
+
+	def _get_captcha_image_url(self,frame):
+		""" inside a captcha frame, download the captcha image """
+		image_elems = frame.find_by_css('div[class="sys-form-fi-captcha sys-event-hook"] > img')
+		if len(image_elems) == 0:
+			return None
+		src = image_elems.first['src']
+		return src
 
 	def _write_record_from_div_list(self,div_list,sleep_time):
 		""" for each record div in the div list, get the html, convert to json, and write the html and json """
@@ -64,6 +92,9 @@ class GISAID:
 						continue
 					## switch the context to the frame
 					with self.browser.get_iframe(frame_elem) as frame:
+						## check for the captcha first
+						if self._check_for_captcha(frame,2):
+							continue
 						tds = frame.find_by_css('td')
 						record_id = None
 						for td in tds:
@@ -102,16 +133,24 @@ class GISAID:
 		record_count = self.browser.find_by_css('span[style="white-space:nowrap;"]').last.value
 		print(record_count)
 
-	def process_records_for_all_pages(self,sleep_time=2):
-		""" get the html files for records for all pages, assuming a start at page 1 """
+	def process_records_for_all_pages(self,form_fields_values_dict,sleep_time=4):
+		""" get the html files for records for all pages for the given form field values, assuming a start at page 1 """
 		more_pages = True
-		next_page = 2
+		current_page = 1
 		while more_pages:
 			time.sleep(sleep_time)
-			print('page',next_page - 1)
-			self.process_records_for_current_page()
-			more_pages = self.navigate_to_page(next_page)
-			next_page += 1
+			print('page',current_page)
+			for field,value in form_fields_values_dict.items():
+				self.fill_date_form_field(field,value)
+				time.sleep(sleep_time)
+			if current_page > 1: # don't go to page 2 before processing page 1 
+				more_pages = self.navigate_to_page(current_page)
+				time.sleep(sleep_time)
+			else: # print the total number of records at the start of page navigation
+				self.print_total_number_of_records_on_all_pages()
+			if more_pages:
+				self.process_records_for_current_page()
+			current_page += 1
 
 	def fill_date_form_field(self,field_name,date):
 		""" given a field_id and date object, fill out a date form field in the main records page 
@@ -130,9 +169,13 @@ class GISAID:
 if __name__ == "__main__":
 	g = GISAID(True)
 	date = date(2020,2,1)
-	g.fill_date_form_field('submission_date_from',date)
-	time.sleep(2)
-	g.fill_date_form_field('submission_date_to',date)
-	time.sleep(2)
-	g.print_total_number_of_records_on_all_pages()
-	g.process_records_for_all_pages()
+	form_field_values_dict = {
+		'submission_date_from':date,
+		'submission_date_to':date,
+	}
+	#g.fill_date_form_field('submission_date_from',date)
+	#time.sleep(2)
+	#g.fill_date_form_field('submission_date_to',date)
+	#time.sleep(2)
+	#g.print_total_number_of_records_on_all_pages()
+	g.process_records_for_all_pages(form_field_values_dict)
