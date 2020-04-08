@@ -90,6 +90,7 @@ class GAlign:
 		vcf_filepath = grec.record_id + ".vcf"
 		a2v.write_vcf_from_mutations(vcf_filepath)
 
+
 class AlnToVCF:
 	""" methods and data structures to take an alignment file and a reference fasta file and produce a vcf file """
 	
@@ -127,8 +128,6 @@ class AlnToVCF:
 			for line in lines:
 				v.write(line)
 			
-		
-
 	def _get_mutations(self):
 		""" iterate through the reference and record sequences and return a list of Mut objects """
 		muts = defaultdict(list)
@@ -227,16 +226,6 @@ class Mut:
 		elif ret_type == 'UNK':
 			ret_alt_seq += mut2.alt_seq			
 		return cls(ret_type, ret_ref_seq, ret_alt_seq, ret_ref_start)
-
-	
-class GClean:
-	""" methods and data structures to clean records prior to data analysis """
-	
-	def __init__(self):
-		pass
-
-	
-
 
 if __name__ == "__main__":
 	pass
