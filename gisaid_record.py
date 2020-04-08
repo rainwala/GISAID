@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import json
 import re
+import os
 from collections import defaultdict
 from Bio import SeqIO, AlignIO
 from Bio.Align.Applications import MafftCommandline
@@ -58,6 +59,7 @@ class GAlign:
 
 	def __init__(self,reference_fasta_filepath):
 		self.reference = SeqIO.read(reference_fasta_filepath, "fasta") 
+		self.reference_fasta_filepath = reference_fasta_filepath
 
 	def _make_alignment_input_file(self,grec):
 		""" make an input file for the sequence alignment method based on the given GRec and the reference record """
@@ -78,31 +80,54 @@ class GAlign:
 			o.write(stdout)
 		return output_filepath
 
-	def _make_vcf_from_alignment(self,alignment_filepath):
-		""" make a PyVCF object from the alignment of this record's fasta to the reference genome """
-		alignment = AlignIO.read(open(alignment_filepath), "clustal")
-		ref = alignment[0]
-		rec = alignment[1]
-		consensus = ''.join('*' if lett_a == lett_b else '.' for lett_a,lett_b in zip(ref, rec))
-		
-
 	def process_grec(self,grec):
 		""" wrapper method to call the above methods to align the fasta from the given GRec and to make a vcf file from the alignment """
 		self._make_alignment_input_file(grec)
 		fasta_filepath = self._make_alignment_input_file(grec)
 		aln_filepath = self._align_fasta_to_ref(grec,fasta_filepath)
-		a2v = AlnToVCF(aln_filepath)
+		os.remove(fasta_filepath)
+		a2v = AlnToVCF(self.reference_fasta_filepath,aln_filepath)
+		vcf_filepath = grec.record_id + ".vcf"
+		a2v.write_vcf_from_mutations(vcf_filepath)
 
 class AlnToVCF:
-	""" methods and data structures to take an alignment file and produce a vcf file """
+	""" methods and data structures to take an alignment file and a reference fasta file and produce a vcf file """
 	
-	def __init__(self,alignment_filepath):
+	def __init__(self,reference_fasta_filepath,alignment_filepath):
 		alignment = AlignIO.read(open(alignment_filepath), "clustal")
+		self.ref_seq_for_vcf = SeqIO.read(reference_fasta_filepath, "fasta").seq.upper()
 		self.reference = alignment[0].seq.upper()
 		self.record = alignment[1].seq.upper()
-		self.cons = ''.join('*' if lett_a == lett_b else '.' for lett_a,lett_b in zip(self.reference, self.record))
 		self.mutations = self._get_mutations()
 		self.mutations = self._consolidate_mutations(self.mutations)
+
+	def write_vcf_from_mutations(self,vcf_filepath):
+		""" write a vcf file using this object's mutations """
+		lines = [
+							"##fileformat=VCFv4.2\n",
+							"CHROM\tID\tPOS\tREF\tALT\n"
+		]
+		CHROM = "NC_045512"
+		ID = "."
+		for pos,mut in self.mutations.items():
+			if (mut.type == 'SUB') or (mut.type == 'UNK'):
+				POS = mut.ref_start + 1
+				REF = mut.ref_seq
+				ALT = mut.alt_seq			
+			elif mut.type == 'DEL':
+				POS = mut.ref_start
+				ALT = self.ref_seq_for_vcf[POS:POS+1]
+				REF = ALT + mut.ref_seq
+			elif mut.type == 'INS':
+				POS = mut.ref_start
+				REF = self.ref_seq_for_vcf[POS:POS+1]
+				ALT = REF + mut.alt_seq
+			lines.append("\t".join([CHROM,ID,str(POS),str(REF),str(ALT)]) + "\n")
+		with open(vcf_filepath,'w') as v:
+			for line in lines:
+				v.write(line)
+			
+		
 
 	def _get_mutations(self):
 		""" iterate through the reference and record sequences and return a list of Mut objects """
@@ -123,16 +148,16 @@ class AlnToVCF:
 				else:
 					type = 'SUB'
 				current_mut = Mut(type,ref_seq,rec_seq,ref_pos) 
-				ref_pos += 1
 			elif rec_seq == '-': # DEL
 				type = 'DEL'
 				current_mut = Mut(type,ref_seq,rec_seq,ref_pos)
-				ref_pos += 1
 			elif ref_seq == '-': # INS
 				type = 'INS'
 				current_mut = Mut(type,ref_seq,rec_seq,ref_pos)
-			print(ref_pos,current_mut)
+			#print(ref_pos,current_mut)
 			muts[ref_pos].append(current_mut)
+			if type != 'INS':
+				ref_pos += 1
 		return muts
 
 	def _consolidate_mutations(self,mutations):
@@ -168,7 +193,6 @@ class AlnToVCF:
 			print(pos,consolidated[pos])
 		return consolidated				 
 				
-		
 
 class Mut:
 	""" data structure to represent a mutation of a record relative to a reference sequence """
