@@ -2,10 +2,10 @@ from bs4 import BeautifulSoup
 import json
 import re
 from collections import defaultdict
-#from Bio import SeqIO, AlignIO
-#from Bio.Align.Applications import MafftCommandline
-#from Bio.SeqRecord import SeqRecord
-#from Bio.Seq import Seq
+from Bio import SeqIO, AlignIO
+from Bio.Align.Applications import MafftCommandline
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
 
 class GRec:
 	""" data structures and methods to deal with individual records parsed from GISAID """
