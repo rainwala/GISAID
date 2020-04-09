@@ -111,7 +111,11 @@ class AlnToVCF:
 		CHROM = "NC_045512"
 		ID = "."
 		for pos,mut in self.mutations.items():
-			if (mut.type == 'SUB') or (mut.type == 'UNK'):
+			if mut.type == 'SUB':
+				POS = mut.ref_start + 1
+				REF = mut.ref_seq
+				ALT = mut.alt_seq		
+			elif mut.type == 'UNK':
 				POS = mut.ref_start + 1
 				REF = mut.ref_seq
 				ALT = mut.alt_seq			
@@ -120,7 +124,7 @@ class AlnToVCF:
 				ALT = self.ref_seq_for_vcf[POS:POS+1]
 				REF = ALT + mut.ref_seq
 			elif mut.type == 'INS':
-				POS = mut.ref_start
+				POS = mut.ref_start + 1
 				REF = self.ref_seq_for_vcf[POS:POS+1]
 				ALT = REF + mut.alt_seq
 			lines.append("\t".join([CHROM,ID,str(POS),str(REF),str(ALT)]) + "\n")
@@ -221,7 +225,7 @@ class Mut:
 		ret_alt_seq = mut1.alt_seq
 		if (ret_type == 'DEL') or (ret_type == 'UNK'):
 			ret_ref_seq += mut2.ref_seq
-		elif ret_type == 'UNK':
+		if ret_type == 'UNK':
 			ret_alt_seq += mut2.alt_seq			
 		return cls(ret_type, ret_ref_seq, ret_alt_seq, ret_ref_start)
 

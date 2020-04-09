@@ -3,10 +3,10 @@ import sys
 from datetime import date, timedelta
 import time
 
-from_date = date(2020,4,4)
-to_date = date(2020,4,4)
+from_date = date(2020,1,1)
+to_date = date(2020,4,8)
 
-g = GISAID(False)
+g = GISAID(headless=True,reverse_record_order=False)
 form_field_values_dict = {
     'submission_date_from':from_date,
     'submission_date_to':to_date,  
