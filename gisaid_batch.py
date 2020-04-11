@@ -1,7 +1,9 @@
 import os
-from gisaid_record import GRec,GAlign
+from gisaid_record import GRec,GAlign,GVCFLine
 from multiprocessing import Process,Manager
 import numpy as np
+from collections import defaultdict
+import sys
 
 class BatchProcess:
 	""" methods to process batches of gisaid files producing more files of different types """
@@ -10,13 +12,13 @@ class BatchProcess:
 		self.dir_path = dir_path
 		pass
 
-	def convert_html_to_json(self):
+	def _convert_html_to_json(self):
 		""" convert all record html files to json files in the given directory """
 		html_files = [name for name in os.listdir(self.dir_path) if name.endswith('.html')]
 		for h in html_files:
 			rec_id = h.rstrip('.html')
 			html = ""
-			with open(h,'r') as f:
+			with open(self.dir_path + '/' + h,'r') as f:
 				html = f.read()
 			gr = GRec(rec_id,html)
 			gr.write_data_to_json_outfile()
@@ -26,11 +28,11 @@ class BatchProcess:
 		for h in html_file_list:
 			rec_id = h.rstrip('.html')
 			html = ""
-			with open(h,'r') as f:
+			with open(self.dir_path + '/' + h,'r') as f:
 				html = f.read()
 			gr = GRec(rec_id,html)
-			ga = GAlign()
-			ga.process_grec(gr)
+			ga = GAlign(gr.get_SeqRecord())
+			ga.process_record()
 
 	def threaded_make_vcf_files_from_html(self,num_threads):
 		""" produce a vcf file for each json record in the given directory, using multithreads """
@@ -43,7 +45,32 @@ class BatchProcess:
 			processes.append(p)
 			p.start()
 	
+	def get_variants_with_records_from_vcf_files(self,include_Ns=False):
+		""" iterate through the vcf files in this directory and return a dict of vcf line : list of all records containing the line """
+		vcf_lines = defaultdict(list)
+		vcf_files = [name for name in os.listdir(self.dir_path) if name.endswith('.vcf')]
+		for v in vcf_files:
+			grec_id = v.rstrip('.vcf')
+			with open(self.dir_path + '/' + v) as f:
+				for line in f:
+					if line.startswith('#') or line.startswith('CHROM'):
+						continue
+					if not include_Ns:
+						alt = line.rstrip('\n').split('\t')[4]
+						if 'N' in alt:
+							continue
+					vcf_lines[line.rstrip('\n')].append(grec_id)
+		return vcf_lines
+			
 
 if __name__ == '__main__':
-	bp = BatchProcess('./')
-	bp.threaded_make_vcf_files_from_html(60)
+	records_dir_path = sys.argv[1]
+	bp = BatchProcess(records_dir_path)
+	#bp.threaded_make_vcf_files_from_html(60)
+	from gisaid_mutation import GisVar
+	variants = bp.get_variants_with_records_from_vcf_files()
+	for var,records in variants.items():
+		if (len(records) < 2) or ('\t0\t' in var) or ('AAA\t' in var):
+			continue
+		gv = GisVar(GVCFLine.from_line(var),records)		
+		print(var,gv._construct_genomic_variant_name(),gv._construct_protein_variant_name(),len(records),records)
