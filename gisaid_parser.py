@@ -24,18 +24,18 @@ class GISAID:
 		self.reverse_record_order = reverse_record_order
 		self.record_dir_path = record_dir_path
 		self.downloaded_record_set = self._get_downloaded_record_set()
-		self.browser = self._login(headless,1)
+		self.browser = self._login(headless,4)
 		self._get_to_covid_records_main_page(5)
 
 	def _get_downloaded_record_set(self):
 		""" make a set of records that have already been downloaded in the record dir """
 		return set([name.rstrip('.html') for name in os.listdir(self.record_dir_path) if (name.endswith('.html')) and (name.startswith('EPI'))])
 
-	def _login(self,headless,sleep_time):
+	def _login(self,headless,wait_time):
 		""" login to the GISAID website """
 		browser = Browser('firefox', headless=headless)
 		browser.visit(self.url)
-		time.sleep(sleep_time)
+		browser.is_text_present('elogin',wait_time=wait_time)
 		browser.find_by_id('elogin').fill(self.username)
 		browser.find_by_id('epassword').fill(self.password)
 		browser.find_by_value('Login').first.click()
@@ -128,8 +128,9 @@ class GISAID:
 						frame.find_by_css('img[src="/epi3/app_entities/entities/icons/24x24/navigate_left.png"]').first.click()
 						break
 	
-	def _reverse_records(self):
+	def _reverse_records(self,wait_time=3):
 		""" reverse the order of records in the main records page """
+		self.browser.is_text_present('Accession ID',wait_time=wait_time)
 		accession_header = self.browser.find_by_value('Accession ID').first
 		accession_header.click()
 
@@ -150,20 +151,22 @@ class GISAID:
 		except:
 			return False
 
-	def _fill_date_form_field(self,field_name,date):
+	def _fill_date_form_field(self,field_name,date,wait_time=4):
 		""" given a field_id and date object, fill out a date form field in the main records page 
 		with a date in the format YYYY-MM-DD """
 		if field_name not in self.form_field_position_dict:
 			return False
 		field_position = self.form_field_position_dict[field_name]
+		self.browser.is_text_present('sys-form-fi-date',wait_time=wait_time)
 		form_elem = self.browser.find_by_css('div[class="sys-form-fi-date"] > input')[field_position]
 		datestring = date.strftime('%Y-%m-%d')
 		form_elem.fill(datestring)
 		## click somewhere else to return focus to the records page
-		self.browser.find_by_value('Search').first.click()
+		#self.browser.find_by_value('Search').first.click()
+		form_elem.click()
 		return True
 
-	def _filter_records(self,form_fields_values_dict,sleep_time=2):
+	def _filter_records(self,form_fields_values_dict,sleep_time=3):
 		""" fill out the form to filter records based on the provided values """
 		for field,value in form_fields_values_dict.items():
 			print(f'filling out {field} with {value}')
@@ -181,10 +184,10 @@ class GISAID:
 		record_count = record_count.replace(',','')
 		return int(record_count)
 
-	def process_records_for_all_pages(self,form_fields_values_dict,sleep_time=2):
+	def process_records_for_all_pages(self,form_fields_values_dict,sleep_time=3):
 		""" get the html files for records for all pages for the given form field values, assuming a start at page 1 """
 		## get the total number of records and the total number of pages
-		self._filter_records(form_fields_values_dict)
+		self._filter_records(form_fields_values_dict,sleep_time=sleep_time)
 		record_count = self._get_total_number_of_records_on_all_pages()
 		page_count = self._get_page_count_from_record_count(record_count)
 		print(f'There are {record_count} records in {page_count} pages')
