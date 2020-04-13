@@ -14,7 +14,6 @@ class GRec:
 		self.record_id = record_id
 		self.html = html
 		self.data = self.parse_html()
-		self.reference_fasta_filepath = ""
 
 	def write_html_to_outfile(self):
 		""" write the record to the given outfile """

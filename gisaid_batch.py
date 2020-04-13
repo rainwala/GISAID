@@ -74,4 +74,4 @@ if __name__ == '__main__':
 			continue
 		gv = GisVar(GVCFLine.from_line(var),records)		
 		print(len(records))
-		print(gv._get_genomic_variant_name())
+		print(gv.make_genomic_variant_name(),gv.make_protein_variant_name())

@@ -96,14 +96,16 @@ class GISAID:
 			d = div_list[curr_div]
 			while True:
 				try:
-					d.click()
 					time.sleep(sleep_time)
+					print(f'trying to click record {d.value}')
+					d.click()
 				## we need this exception here as it signifies that the frame html has been generated
 				## (it is triggered when splinter tries to click on the next div behind the frame)
 				except:
 					time.sleep(sleep_time)
 					## this next try catch block is for when the iframe hasn't loaded yet
 					try:
+						print('looking for record iframe')
 						frame_elem = self.browser.find_by_css('iframe').first	
 					except:
 						continue
@@ -125,6 +127,7 @@ class GISAID:
 							gr.write_html_to_outfile()
 							gr.write_data_to_json_outfile()
 						curr_div += 1
+						frame.is_text_present('navigate_left',wait_time=10)
 						frame.find_by_css('img[src="/epi3/app_entities/entities/icons/24x24/navigate_left.png"]').first.click()
 						break
 	
@@ -136,7 +139,7 @@ class GISAID:
 
 	def _process_records_for_current_page(self):
 		""" wrapper for the above methods to get parsed output file for each record from the current records page """
-		div_list = self._get_record_div_list_from_current_page(5)
+		div_list = self._get_record_div_list_from_current_page(30)
 		print(f'{len(div_list)} new records in this page')
 		self._write_record_from_div_list(div_list,2)
 
@@ -151,7 +154,7 @@ class GISAID:
 		except:
 			return False
 
-	def _fill_date_form_field(self,field_name,date,wait_time=4):
+	def _fill_date_form_field(self,field_name,date,wait_time=30):
 		""" given a field_id and date object, fill out a date form field in the main records page 
 		with a date in the format YYYY-MM-DD """
 		if field_name not in self.form_field_position_dict:
@@ -160,10 +163,15 @@ class GISAID:
 		self.browser.is_text_present('sys-form-fi-date',wait_time=wait_time)
 		form_elem = self.browser.find_by_css('div[class="sys-form-fi-date"] > input')[field_position]
 		datestring = date.strftime('%Y-%m-%d')
+		print('filling out date form')
 		form_elem.fill(datestring)
+		print('filled!')
 		## click somewhere else to return focus to the records page
-		#self.browser.find_by_value('Search').first.click()
-		form_elem.click()
+		print('clicking elsewhere')
+		self.browser.is_text_present('Search',wait_time=wait_time)
+		self.browser.find_by_value('Search').first.click()
+		#form_elem.click()
+		print('clicked!')
 		return True
 
 	def _filter_records(self,form_fields_values_dict,sleep_time=3):
