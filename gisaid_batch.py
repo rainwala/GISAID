@@ -70,8 +70,7 @@ if __name__ == '__main__':
 	from gisaid_variant import GisVar
 	variants = bp.get_variants_with_records_from_vcf_files()
 	for var,records in variants.items():
-		if (len(records) < 2) or ('\t0\t' in var) or ('AAA\t' in var):
+		if (len(records) < 1) or ('\t0\t' in var) or ('AAA\t' in var):
 			continue
 		gv = GisVar(GVCFLine.from_line(var),records)		
-		print(len(records))
-		print(gv.make_genomic_variant_name(),gv.make_protein_variant_name())
+		print(gv.make_genomic_variant_name(),gv.make_protein_variant_name(),len(records),sorted(records))

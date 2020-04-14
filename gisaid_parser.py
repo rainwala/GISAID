@@ -10,7 +10,7 @@ import math
 
 class GISAID:
 	""" methods to extract individual records from the GISAID website """
-	def __init__(self,headless=True,reverse_record_order=False,record_dir_path="/home/aawan/SHARED/COVID-19/GISAID/records/20200411"):
+	def __init__(self,headless=True,reverse_record_order=False,record_dir_path="/home/aawan/SHARED/COVID-19/GISAID/records/20200412"):
 		self.url = 'https://www.epicov.org/epi3/frontend'
 		self.username = 'rainwala'
 		self.password = 'GuhRsX9o'
@@ -25,7 +25,7 @@ class GISAID:
 		self.record_dir_path = record_dir_path
 		self.downloaded_record_set = self._get_downloaded_record_set()
 		self.browser = self._login(headless,4)
-		self._get_to_covid_records_main_page(5)
+		self._get_to_covid_records_main_page(4)
 
 	def _get_downloaded_record_set(self):
 		""" make a set of records that have already been downloaded in the record dir """
@@ -143,9 +143,11 @@ class GISAID:
 		print(f'{len(div_list)} new records in this page')
 		self._write_record_from_div_list(div_list,2)
 
-	def _navigate_to_page(self,page_num):
+	def _navigate_to_page(self,page_num,wait_time=3):
 		""" load the given page of records """
 		try:
+			print(f'trying to go to page {page_num}')
+			self.browser.is_text_present(f'page="{page_num}"',wait_time=wait_time)
 			page_elem = self.browser.find_by_css(f'a[page="{page_num}"]')
 			if len(page_elem) == 0:
 				return False
@@ -163,6 +165,8 @@ class GISAID:
 		self.browser.is_text_present('sys-form-fi-date',wait_time=wait_time)
 		form_elem = self.browser.find_by_css('div[class="sys-form-fi-date"] > input')[field_position]
 		datestring = date.strftime('%Y-%m-%d')
+		print('getting record count')
+		record_count = self._get_total_number_of_records_on_all_pages()
 		print('filling out date form')
 		form_elem.fill(datestring)
 		print('filled!')
@@ -172,6 +176,11 @@ class GISAID:
 		self.browser.find_by_value('Search').first.click()
 		#form_elem.click()
 		print('clicked!')
+		## wait until the record count has changed before proceeding
+		print('checking for updated record count')
+		new_record_count = self._get_total_number_of_records_on_all_pages()
+		while new_record_count == record_count:
+			new_record_count = self._get_total_number_of_records_on_all_pages()
 		return True
 
 	def _filter_records(self,form_fields_values_dict,sleep_time=3):
@@ -179,31 +188,41 @@ class GISAID:
 		for field,value in form_fields_values_dict.items():
 			print(f'filling out {field} with {value}')
 			self._fill_date_form_field(field,value)
-			time.sleep(sleep_time)
 		if self.reverse_record_order: # sometimes we want to process records in reverse id order
+			time.sleep(sleep_time)
 			print('reversing records')
 			self._reverse_records()
 			time.sleep(sleep_time)
 
-	def _get_total_number_of_records_on_all_pages(self):
+	def _get_total_number_of_records_on_all_pages(self,wait_time=10):
 		""" get the total number of records found on all pages of the main records page """
+		self.browser.is_text_present('white-space:nowrap',wait_time=wait_time)
 		record_count = self.browser.find_by_css('span[style="white-space:nowrap;"]').last.value
 		record_count = re.sub(r'^\s*Total:\s+(\S+)\s+.+',r'\1',record_count)
 		record_count = record_count.replace(',','')
 		return int(record_count)
 
-	def process_records_for_all_pages(self,form_fields_values_dict,sleep_time=3):
+	def process_records_for_page_range(self,form_fields_values_dict,start_page=1,end_page=False,sleep_time=3):
 		""" get the html files for records for all pages for the given form field values, assuming a start at page 1 """
 		## get the total number of records and the total number of pages
 		self._filter_records(form_fields_values_dict,sleep_time=sleep_time)
 		record_count = self._get_total_number_of_records_on_all_pages()
 		page_count = self._get_page_count_from_record_count(record_count)
-		print(f'There are {record_count} records in {page_count} pages')
+		if not end_page:
+			end_page = page_count
+		print(f'There are {record_count} records in {page_count} pages, and we are processing pages {start_page} to {end_page}')
 		## process the first page
-		print('page 1')
+		print(f'page {start_page}')
+		if start_page > 1:
+			pages_per_display = 10
+			current_last_page = pages_per_display
+			while(current_last_page < start_page):
+				self._navigate_to_page(current_last_page)
+				current_last_page += pages_per_display
+			self._navigate_to_page(start_page)
 		self._process_records_for_current_page()
 		## process the remaining pages
-		for i in range(2,page_count + 1):
+		for i in range(start_page + 1,end_page + 1):
 			print('page',i)
 			self._navigate_to_page(i)
 			time.sleep(sleep_time)

@@ -2,6 +2,7 @@ from gisaid_record import GVCFLine
 from Bio import SeqIO
 from Bio.SeqUtils import seq3
 import math
+import difflib
 
 class GisVar:
 	""" methods and data structures to process and represent variants from vcf files made from alignments of records to the reference 
@@ -40,7 +41,12 @@ class GisVar:
 	
 	def _get_genomic_bounds(self):
 		""" return the genome start and end position """
-		return self.GVCFLine.get_int_position(), self.GVCFLine.get_int_position() + len(self.GVCFLine.ref_seq)
+		genome_start_pos = self.GVCFLine.get_int_position()
+		genome_end_pos = self.GVCFLine.get_int_position() + 1
+		if (self.type == 'deletion'): # remember that for deletions the vcf postions starts from the base before the variant sequence
+			genome_start_pos += 1
+			genome_end_pos = genome_start_pos + (len(self.GVCFLine.ref_seq) - 2)
+		return genome_start_pos, genome_end_pos
 
 	def make_genomic_variant_name(self):
 		""" return an hgvs object representing this variant with respect to the reference genome """
@@ -67,20 +73,34 @@ class GisVar:
 		if (self.type != 'substitution'):
 			indel_length = abs(len(self.GVCFLine.alt_seq) - len(self.GVCFLine.ref_seq))
 			if indel_length % 3 != 0:
-				return 'p.(' + ref_first_AA_3letter + str(var_start_codon) + 'fs)'
+				return f'{prot_name}:p.(' + ref_first_AA_3letter + str(var_start_codon) + 'fs)'
 		ref_last_AA_3letter = seq3(ref_AA_seq[-1])	
 		name = None
 		## handle substitutions
 		if self.type == 'substitution':
 			var_AA_seq = self._get_protein_variant_sequence(prot_name)
-			name =  'p.' + ref_first_AA_3letter + str(var_start_codon) + seq3(var_AA_seq[0])
+			name =  f'{prot_name}:p.' + ref_first_AA_3letter + str(var_start_codon) + seq3(var_AA_seq[0])
 		## handle deletions
 		elif self.type == 'deletion':
-			name = 'p.' + ref_first_AA_3letter + str(var_start_codon) + "_" + ref_last_AA_3letter + str(var_end_codon) + 'del'
+			var_AA_seq = self._get_protein_variant_sequence(prot_name)
+			## compare the reference protein to the deletion to determine what was deleted
+			deleted_positions = []
+			deleted_AA_3letter = []
+			for i,s in enumerate(difflib.ndiff(ref_AA_seq, var_AA_seq)):
+				if s[0]==' ': continue
+				elif s[0]=='-':
+					deleted_positions.append(i)
+					deleted_AA_3letter.append(seq3(s[-1]))
+			#name = f'{prot_name}:p.' + ref_first_AA_3letter + str(var_start_codon) + "_" + ref_last_AA_3letter + str(var_end_codon) + 'del'
+			name = f'{prot_name}:p.' + str(deleted_AA_3letter[0]) + str(var_start_codon + deleted_positions[0])
+			if len(deleted_positions) > 1:
+				name += '_' + str(deleted_AA_3letter[-1]) + str(var_start_codon + deleted_positions[-1])  
+			name += 'del'
 		## handle insertions
 		elif self.type == 'insertion':
 			var_AA_seq = self._get_protein_variant_sequence(prot_name)
-			name = 'p.' + ref_first_AA_3letter + str(var_start_codon) + "_" + ref_last_AA_3letter + str(var_end_codon) + 'ins' + seq3(var_AA_seq)
+			name = f'{prot_name}:p.' + ref_first_AA_3letter + str(var_start_codon) + "_" + ref_last_AA_3letter + str(var_end_codon) 
+			name += 'ins' + seq3(var_AA_seq[1:-1])
 		return name
 
 	def is_synonymous(self):
@@ -125,7 +145,7 @@ class GisVar:
 		end_adjustment = prot_DNA_end % 3
 		ref_prot_DNA_start = prot_DNA_start - start_adjustment
 		ref_prot_DNA_end = prot_DNA_end
-		if end_adjustment > 0:
+		if (end_adjustment > 0) or (prot_DNA_start == prot_DNA_end): # even when the deletion is one base -- we still want to return a single AA
 			ref_prot_DNA_end += (3 - end_adjustment)
 		## convert the co-ords back to genomic ones
 		adjusted_genome_start,adjusted_genome_end = self._convert_protein_DNA_coords_to_genomic(protein_name,ref_prot_DNA_start,ref_prot_DNA_end)
@@ -144,16 +164,17 @@ class GisVar:
     the entire codon containing 'self.genome_end' """
 		## get the reference DNA sequence and start and end DNA positions of the affected reference codons
 		ref_DNA_seq, ref_prot_DNA_start, ref_prot_DNA_end, prot_DNA_start, prot_DNA_end = self._get_protein_affected_reference_sequence(protein_name,verbose=True)
-		print('ref',ref_DNA_seq)
+		var_pos = prot_DNA_start - ref_prot_DNA_start
 		if self.type == 'insertion':
-			ins_pos = prot_DNA_start - ref_prot_DNA_start
-			var_DNA_seq = ref_DNA_seq[0:ins_pos] + self.GVCFLine.alt_seq + ref_DNA_seq[ins_pos + 1:]
+			var_DNA_seq = ref_DNA_seq[0:var_pos] + self.GVCFLine.alt_seq + ref_DNA_seq[var_pos + 1:]
 		elif self.type == 'substitution':
 			sub_pos = prot_DNA_start - ref_prot_DNA_start # sub_pos should only ever be 0,1, or 2
-			print('sub',sub_pos,ref_DNA_seq[0:sub_pos - 1],self.GVCFLine.alt_seq,ref_DNA_seq[sub_pos + 1:])
-			var_DNA_seq = ref_DNA_seq[0:sub_pos] + self.GVCFLine.alt_seq
-			if sub_pos < 2:
-				var_DNA_seq += ref_DNA_seq[sub_pos + 1:]
-		print(self.type,var_DNA_seq)
+			#print('sub',var_pos,ref_DNA_seq[0:var_pos - 1],self.GVCFLine.alt_seq,ref_DNA_seq[var_pos + 1:])
+			var_DNA_seq = ref_DNA_seq[0:var_pos] + self.GVCFLine.alt_seq
+			if var_pos < 2:
+				var_DNA_seq += ref_DNA_seq[var_pos + 1:]
+		elif self.type == 'deletion':
+			deletion_length = len(self.GVCFLine.ref_seq) - len(self.GVCFLine.alt_seq)
+			var_DNA_seq = ref_DNA_seq[0:var_pos] + ref_DNA_seq[var_pos + deletion_length:]
 		return var_DNA_seq.translate()
 			
