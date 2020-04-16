@@ -117,7 +117,7 @@ class GISAID:
 						tds = frame.find_by_css('td')
 						record_id = None
 						for td in tds:
-							if 'EPI_' in td.value:
+							if td.value.startswith('EPI_'):
 								record_id = td.value
 						if record_id is not None:
 							print(record_id)
@@ -137,26 +137,37 @@ class GISAID:
 		accession_header = self.browser.find_by_value('Accession ID').first
 		accession_header.click()
 
+	def _get_selected_page(self,wait_time=3):
+		""" return the current, selected, page number """
+		self.browser.is_text_present('yui-pg-current-page yui-pg-page',wait_time=wait_time)
+		return int(self.browser.find_by_css('span[class="yui-pg-current-page yui-pg-page"]').first.value)
+		
 	def _process_records_for_current_page(self):
 		""" wrapper for the above methods to get parsed output file for each record from the current records page """
 		div_list = self._get_record_div_list_from_current_page(30)
 		print(f'{len(div_list)} new records in this page')
-		self._write_record_from_div_list(div_list,2)
+		self._write_record_from_div_list(div_list,3)
 
-	def _navigate_to_page(self,page_num,wait_time=3):
+	def _navigate_to_page(self,page_num,wait_time=10):
 		""" load the given page of records """
 		try:
 			print(f'trying to go to page {page_num}')
 			self.browser.is_text_present(f'page="{page_num}"',wait_time=wait_time)
 			page_elem = self.browser.find_by_css(f'a[page="{page_num}"]')
 			if len(page_elem) == 0:
+				print(f'failed to go to page {page_num} as it is not clickable')
 				return False
 			page_elem.first.click()
+			## make sure that we have navigated to the correct page
+			navigated_page = self._get_selected_page()
+			while navigated_page != page_num:
+				navigated_page = self._get_selected_page()
+			print(f'successfully gone to page {page_num}')
 			return True
 		except:
 			return False
 
-	def _fill_date_form_field(self,field_name,date,wait_time=30):
+	def _fill_date_form_field(self,field_name,date,wait_time=15):
 		""" given a field_id and date object, fill out a date form field in the main records page 
 		with a date in the format YYYY-MM-DD """
 		if field_name not in self.form_field_position_dict:
@@ -194,7 +205,7 @@ class GISAID:
 			self._reverse_records()
 			time.sleep(sleep_time)
 
-	def _get_total_number_of_records_on_all_pages(self,wait_time=10):
+	def _get_total_number_of_records_on_all_pages(self,wait_time=15):
 		""" get the total number of records found on all pages of the main records page """
 		self.browser.is_text_present('white-space:nowrap',wait_time=wait_time)
 		record_count = self.browser.find_by_css('span[style="white-space:nowrap;"]').last.value
@@ -214,8 +225,8 @@ class GISAID:
 		## process the first page
 		print(f'page {start_page}')
 		if start_page > 1:
-			pages_per_display = 10
-			current_last_page = pages_per_display
+			pages_per_display = 4
+			current_last_page = 10
 			while(current_last_page < start_page):
 				self._navigate_to_page(current_last_page)
 				current_last_page += pages_per_display
@@ -223,7 +234,6 @@ class GISAID:
 		self._process_records_for_current_page()
 		## process the remaining pages
 		for i in range(start_page + 1,end_page + 1):
-			print('page',i)
 			self._navigate_to_page(i)
 			time.sleep(sleep_time)
 			self._process_records_for_current_page()

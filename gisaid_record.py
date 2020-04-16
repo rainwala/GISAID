@@ -179,22 +179,24 @@ class AlnToVCF:
 		GVCFLine_list = []
 		CHROM = "NC_045512"
 		ID = "."
-		for pos,mut in self.mutations.items(): # keep in mind that the self.mutations objects are zero-indexed, whereas VCF is 1-indexed
+		## keep in mind that the self.mutations objects are zero-indexed, whereas VCF is 1-indexed, BUT the start bases for DEL and INS 
+		## are one base prior to the actual variant bases
+		for pos,mut in self.mutations.items(): 
 			if mut.type == 'SUB':
-				POS = mut.ref_start + 1
+				POS = mut.ref_start 
 				REF = mut.ref_seq
 				ALT = mut.alt_seq		
 			elif mut.type == 'UNK':
-				POS = mut.ref_start + 1
+				POS = mut.ref_start 
 				REF = mut.ref_seq
 				ALT = mut.alt_seq			
 			elif mut.type == 'DEL':
-				POS = mut.ref_start
-				ALT = self.ref_seq_for_vcf[POS:POS+1]
+				POS = mut.ref_start 
+				ALT = self.ref_seq_for_vcf[POS - 1:POS]
 				REF = ALT + mut.ref_seq
 			elif mut.type == 'INS':
-				POS = mut.ref_start
-				REF = self.ref_seq_for_vcf[POS:POS+1]
+				POS = mut.ref_start 
+				REF = self.ref_seq_for_vcf[POS - 1:POS]
 				ALT = REF + mut.alt_seq
 			GVCFLine_list.append( GVCFLine(CHROM,ID,str(POS),str(REF),str(ALT)) )
 		gvcf = GVCF(header,GVCFLine_list)

@@ -34,10 +34,13 @@ class BatchProcess:
 			ga = GAlign(gr.get_SeqRecord())
 			ga.process_record()
 
-	def threaded_make_vcf_files_from_html(self,num_threads):
+	def threaded_make_vcf_files_from_html(self,num_threads,replace=False):
 		""" produce a vcf file for each json record in the given directory, using multithreads """
-		vcf_files = set([name for name in os.listdir(self.dir_path) if name.endswith('.vcf')])
-		html_files = [name for name in os.listdir(self.dir_path) if name.endswith('.html') and name not in vcf_files]
+		if not replace:
+			vcf_files = set([name for name in os.listdir(self.dir_path) if name.endswith('.vcf')])
+			html_files = [name for name in os.listdir(self.dir_path) if name.endswith('.html') and name not in vcf_files]
+		else:
+			html_files = [name for name in os.listdir(self.dir_path) if name.endswith('.html')]
 		splits = np.array_split(html_files,num_threads)
 		processes = []
 		for i in range(len(splits)):
@@ -66,11 +69,11 @@ class BatchProcess:
 if __name__ == '__main__':
 	records_dir_path = sys.argv[1]
 	bp = BatchProcess(records_dir_path)
-	#bp.threaded_make_vcf_files_from_html(60)
+	#bp.threaded_make_vcf_files_from_html(60,replace=True)
 	from gisaid_variant import GisVar
 	variants = bp.get_variants_with_records_from_vcf_files()
 	for var,records in variants.items():
 		if (len(records) < 1) or ('\t0\t' in var) or ('AAA\t' in var):
 			continue
 		gv = GisVar(GVCFLine.from_line(var),records)		
-		print(gv.make_genomic_variant_name(),gv.make_protein_variant_name(),len(records),sorted(records))
+		print(gv.make_genomic_variant_name(),gv.make_protein_variant_name(),len(records),records[0])
