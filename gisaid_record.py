@@ -182,14 +182,13 @@ class AlnToVCF:
 		## keep in mind that the self.mutations objects are zero-indexed, whereas VCF is 1-indexed, BUT the start bases for DEL and INS 
 		## are one base prior to the actual variant bases
 		for pos,mut in self.mutations.items(): 
+			## don't consider mutations with 'Ns'
+			if mut.type == 'UNK':
+				continue
 			if mut.type == 'SUB':
-				POS = mut.ref_start 
+				POS = mut.ref_start + 1
 				REF = mut.ref_seq
 				ALT = mut.alt_seq		
-			elif mut.type == 'UNK':
-				POS = mut.ref_start 
-				REF = mut.ref_seq
-				ALT = mut.alt_seq			
 			elif mut.type == 'DEL':
 				POS = mut.ref_start 
 				ALT = self.ref_seq_for_vcf[POS - 1:POS]
@@ -254,10 +253,8 @@ class AlnToVCF:
 			sorted_pos = list(sorted(consolidated))
 			for i in range(len(sorted_pos) - 1):
 				cons_mut = AlnMut.consolidate(consolidated[sorted_pos[i]], consolidated[sorted_pos[i+1]])
-				#print(len(sorted_pos),i,sorted_pos[i],cons_mut)
 				if cons_mut is None:
 					continue
-				#print(cons_mut)
 				consolidated[sorted_pos[i]] = cons_mut
 				del(consolidated[sorted_pos[i+1]])
 				consolidation = True
@@ -266,7 +263,7 @@ class AlnToVCF:
 				
 
 class AlnMut:
-	""" data structure to represent a mutation of an alignment of a record relative to a reference sequence """
+	""" data structure to represent a zero-indexed mutation of an alignment of a record relative to a reference sequence """
 	
 	def __init__(self,mut_type,ref_seq,alt_seq,ref_start):
 		self.type = mut_type # one of SUB,INS,DEL,UNK describing the relationship of the record seq to the reference seq for this mutation

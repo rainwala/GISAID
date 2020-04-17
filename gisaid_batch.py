@@ -69,11 +69,11 @@ class BatchProcess:
 if __name__ == '__main__':
 	records_dir_path = sys.argv[1]
 	bp = BatchProcess(records_dir_path)
-	#bp.threaded_make_vcf_files_from_html(60,replace=True)
-	from gisaid_variant import GisVar
-	variants = bp.get_variants_with_records_from_vcf_files()
-	for var,records in variants.items():
-		if (len(records) < 1) or ('\t0\t' in var) or ('AAA\t' in var):
-			continue
-		gv = GisVar(GVCFLine.from_line(var),records)		
-		print(gv.make_genomic_variant_name(),gv.make_protein_variant_name(),len(records),records[0])
+	bp.threaded_make_vcf_files_from_html(60,replace=True)
+	#from gisaid_variant import GisVar
+	#variants = bp.get_variants_with_records_from_vcf_files()
+	#for var,records in variants.items():
+	#	if (len(records) < 1) or ('\t0\t' in var) or ('AAA\t' in var):
+	#		continue
+	#	gv = GisVar(GVCFLine.from_line(var),records)		
+	#	print(gv.make_genomic_variant_name(),gv.make_protein_variant_name(),len(records),records[0])

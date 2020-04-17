@@ -81,7 +81,7 @@ class GisVar:
 		codon_end_pos = codon_start_pos + 2
 		return self.reference.seq[codon_start_pos - 1 : codon_end_pos].upper()
 		
-	def _get_ref_AA_full_codon_seqs_between_two_genome_positions(self,genome_position1,genome_position2):
+	def _get_ref_DNA_full_codon_seqs_between_two_genome_positions(self,genome_position1,genome_position2):
 		""" get the reference AA sequence with which a comparison for naming will be made """
 		codon_number1 = self._get_codon_number_for_genomic_position(genome_position1)
 		codon_number2 = self._get_codon_number_for_genomic_position(genome_position2)
@@ -91,18 +91,41 @@ class GisVar:
 		protein_name = self._get_protein_name_for_genomic_position(genome_position1)
 		if protein_name != self._get_protein_name_for_genomic_position(genome_position2):
 			return None
-		ref_AA_seq = ""
+		ref_DNA_seq = ""
 		for cn in range(codon_number1,codon_number2 + 1):
-			ref_AA_seq += self._get_protein_codon_DNA_seq(protein_name,cn).translate()
-		return ref_AA_seq
+			ref_DNA_seq += self._get_protein_codon_DNA_seq(protein_name,cn)
+		return ref_DNA_seq
 
-	def _get_var_AA_seq_for_comparison(self):
-		""" get the variant sequence with which a comparison for naming will be made """
-		pass
-
-	def _compare_ref_and_var_AA_for_indel_name(self):
-		""" """
-		pass
+	def _get_ref_and_var_AA_difference_for_indel_name(self,start_codon_number,ref_AA_seq,var_AA_seq):
+		""" compare the ref and var AA seqs to allow protein-level naming for indels """
+		insertions = {}
+		deletions = {}		
+		## the offset is needed to handle cases where there is a delins that deletes the first reference codon
+		offset = 0
+		if not var_AA_seq.startswith(ref_AA_seq[0]):
+			offset = 1
+		for i,s in enumerate(difflib.ndiff(ref_AA_seq, var_AA_seq)):
+			if s[0]==' ': continue
+			if s[0]=='-':
+				deletions[(start_codon_number + i) - offset] = seq3(s[-1])
+			elif s[0]=='+':
+				insertions[(start_codon_number + i) - offset] = seq3(s[-1])
+		## process the deletions
+		name = ""
+		if (len(deletions) > 0):
+			if len(deletions) == 1:
+				pos = sorted(deletions)[0]
+				name = deletions[pos] + str(pos)
+			else:
+				min_pos = sorted(deletions)[0]
+				max_pos = sorted(deletions)[-1]
+				name = deletions[min_pos] + str(min_pos) + "_" + deletions[max_pos] + str(max_pos) 
+			name += 'del'
+		if len(insertions) > 0:
+			name += 'ins'
+			for pos in sorted(insertions):
+				name += insertions[pos]
+		return name
 
 	def is_synonymous(self):
 		""" based on the protein name, return whether this mutation is synonymous or not """
@@ -131,7 +154,7 @@ class GisSub(GisVar):
 		ref_codon_DNA = self._get_protein_codon_DNA_seq(protein_name,codon_number)
 		ref_codon_AA_3letter = seq3(ref_codon_DNA.translate())
 		var_frame = self._get_frame_for_genomic_position(self.genome_start) 
-		var_codon_AA_3letter = seq3( (ref_codon_DNA[0:var_frame] + Seq(self.GVCFLine.alt_seq) + ref_codon_DNA[var_frame:]).translate())
+		var_codon_AA_3letter = seq3( (ref_codon_DNA[:var_frame-1] + self.GVCFLine.alt_seq + ref_codon_DNA[var_frame:]).translate() )
 		return f'{protein_name}:p.{ref_codon_AA_3letter}{codon_number}{var_codon_AA_3letter}'
 		
 
@@ -146,8 +169,32 @@ class GisDel(GisVar):
 
 	def make_genomic_variant_name(self):
 		""" make the name of this variant with respect to the reference genome """
+		if self.genome_start == self.genome_end: # handle the case where the deletion is just 1 bp
+			return f'{self.reference_genome_name}:g.{self.genome_start}del'
 		return f'{self.reference_genome_name}:g.{self.genome_start}_{self.genome_end}del'
 		
+	def make_protein_variant_name(self):
+		""" make the name of this variant with respect to a viral protein, if the variant is in a protein """
+		protein_name = self._get_protein_name_for_genomic_position(self.genome_start)
+		if protein_name is None:
+			return None
+		start_codon_number = self._get_codon_number_for_genomic_position(self.genome_start)
+		start_codon_DNA = self._get_protein_codon_DNA_seq(protein_name,start_codon_number)
+		start_codon_AA_3letter = seq3(start_codon_DNA.translate())
+		## if the variant is in a coding region and its length is not divisible by 3, return a frameshift name
+		if (len(self.GVCFLine.ref_seq) - 1) % 3 != 0: # keep in mind the ref seq from a VCF always has one extra 3' base
+			return f'{protein_name}:p.({start_codon_AA_3letter}{start_codon_number})fs'
+		ref_DNA_seq = self._get_ref_DNA_full_codon_seqs_between_two_genome_positions(self.genome_start,self.genome_end)
+		ref_AA_seq = ref_DNA_seq.translate()
+		start_frame = self._get_frame_for_genomic_position(self.genome_start)
+		end_frame = self._get_frame_for_genomic_position(self.genome_end)
+		del_start = start_frame-1
+		num_codons_in_ref_DNA_Seq = (len(ref_DNA_seq))/3
+		del_end = 3*int(num_codons_in_ref_DNA_Seq - 1) + end_frame
+		var_DNA_seq = ref_DNA_seq[:del_start] + ref_DNA_seq[del_end:]
+		var_AA_seq = var_DNA_seq.translate()
+		indel_name = self._get_ref_and_var_AA_difference_for_indel_name(start_codon_number,ref_AA_seq,var_AA_seq)
+		return f'{protein_name}:p.{indel_name}'
 
 class GisIns(GisVar):
 	""" methods and data structures to process and represent insertion variants """
