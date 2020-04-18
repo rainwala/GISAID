@@ -10,7 +10,7 @@ import math
 
 class GISAID:
 	""" methods to extract individual records from the GISAID website """
-	def __init__(self,headless=True,reverse_record_order=False,record_dir_path="/home/aawan/SHARED/COVID-19/GISAID/records/20200416"):
+	def __init__(self,headless=True,reverse_record_order=False,record_dir_path="/home/aawan/SHARED/COVID-19/GISAID/records/20200417"):
 		self.url = 'https://www.epicov.org/epi3/frontend'
 		self.username = 'rainwala'
 		self.password = 'GuhRsX9o'

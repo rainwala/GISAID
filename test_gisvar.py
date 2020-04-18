@@ -50,6 +50,21 @@ class TestGisVar:
 		ins_gvcf_line = GVCFLine.from_line("NC_045512\t.\t3336\tA\tAATC\n")
 		return GisVar(ins_gvcf_line,['EPI_ISL_410721'])
 
+	@pytest.fixture
+	def ins_gvcf2(self):
+		ins_gvcf_line = GVCFLine.from_line("NC_045512\t.\t22304\tT\tTCCCACCAGA\n")
+		return GisVar(ins_gvcf_line,['EPI_ISL_420726'])
+
+	@pytest.fixture
+	def ins_gvcf3(self):
+		ins_gvcf_line = GVCFLine.from_line("NC_045512\t.\t54\tT\tTC\n")
+		return GisVar(ins_gvcf_line,['EPI_ISL_416654'])
+
+	@pytest.fixture
+	def ins_gvcf4(self):
+		ins_gvcf_line = GVCFLine.from_line("NC_045512\t.\t21569\tG\tGT\n")
+		return GisVar(ins_gvcf_line,['EPI_ISL_420942'])
+
 	""" GisVar level tests """
 
 	def test_get_var_type_child(self,sub_gvcf,del_gvcf,ins_gvcf):
@@ -109,3 +124,15 @@ class TestGisVar:
 		assert None == del_gvcf3.get_var_type_child().make_protein_variant_name()
 		assert 'ORF7a:p.Leu12_Leu17del' == del_gvcf4.get_var_type_child().make_protein_variant_name()
 		assert 'S:p.(Phe456fs)'
+
+	def test_ins_gvcf_make_genomic_variant_name(self,ins_gvcf,ins_gvcf2,ins_gvcf3,ins_gvcf4):
+		assert 'NC_045512.2:g.3336_3337insATC' == ins_gvcf.get_var_type_child().make_genomic_variant_name()
+		assert 'NC_045512.2:g.22304_22305insCCCACCAGA' == ins_gvcf2.get_var_type_child().make_genomic_variant_name()
+		assert 'NC_045512.2:g.54_55insC' == ins_gvcf3.get_var_type_child().make_genomic_variant_name()
+		assert 'NC_045512.2:g.21569_21570insT' == ins_gvcf4.get_var_type_child().make_genomic_variant_name()
+
+	def test_ins_gvcf_make_protein_variant_name(self,ins_gvcf,ins_gvcf2,ins_gvcf3,ins_gvcf4):
+		assert 'nsp3:p.Glu206_Val207insSer' == ins_gvcf.get_var_type_child().make_protein_variant_name()
+		assert 'S:p.Tyr248delinsSerHisGlnAsn' == ins_gvcf2.get_var_type_child().make_protein_variant_name()
+		assert None == ins_gvcf3.get_var_type_child().make_protein_variant_name()
+		assert 'S:p.(Val3)fs' == ins_gvcf4.get_var_type_child().make_protein_variant_name()
