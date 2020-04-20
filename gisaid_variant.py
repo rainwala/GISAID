@@ -23,19 +23,39 @@ class GisVar:
 		}		 
 		self.GVCFLine = GVCFLine
 		self.record_id_list = record_id_list
+		self.type = self.get_type()
+		self.type_object_dict = {
+			'sub':GisSub, 'del':GisDel, 'ins':GisIns, 
+		}
 
+	def get_type(self):
+		""" return the type of variant this is """
+		if len(self.GVCFLine.ref_seq) == len(self.GVCFLine.alt_seq):
+			return 'sub'
+		elif (len(self.GVCFLine.alt_seq) == 1) and (len(self.GVCFLine.ref_seq) > len(self.GVCFLine.alt_seq)):
+			return 'del'
+		elif (len(self.GVCFLine.ref_seq) == 1) and (len(self.GVCFLine.alt_seq) > len(self.GVCFLine.ref_seq)):
+			return 'ins'
+		
 	def get_var_type_child(self):
 		""" return the a child object of the type of variant this is """
-		if len(self.GVCFLine.ref_seq) == len(self.GVCFLine.alt_seq):
-			return GisSub(self.GVCFLine,self.record_id_list)
-		if (len(self.GVCFLine.alt_seq) == 1) and (len(self.GVCFLine.ref_seq) > len(self.GVCFLine.alt_seq)):
-			return GisDel(self.GVCFLine,self.record_id_list)
-		if (len(self.GVCFLine.ref_seq) == 1) and (len(self.GVCFLine.alt_seq) > len(self.GVCFLine.ref_seq)):
-			return GisIns(self.GVCFLine,self.record_id_list)
+		return self.type_object_dict[self.type](self.GVCFLine,self.record_id_list)
 
 	def make_genomic_variant_name(self):
 		""" make the name of this variant with respect to the reference genome """
 		pass	
+
+	def get_protein_name(self):
+		""" return the name of the protein this variant is found in, or None """
+		start_protein_name = self._get_protein_name_for_genomic_position(self.GVCFLine.pos)
+		if start_protein_name is None:
+			return None
+		end_protein_name = self._get_protein_name_for_genomic_position(
+			self.GVCFLine.pos + max(len(self.GVCFLine.ref_seq), len(self.GVCFLine.alt_seq)) 
+		)
+		if end_protein_name != start_protein_name:
+			return None
+		return start_protein_name
 
 	def make_protein_variant_name(self):
 		""" make the name of this variant with respect to a viral protein, if the variant is in a protein """
@@ -129,9 +149,11 @@ class GisVar:
 				name += insertions[pos]
 		return name
 
-	def is_synonymous(self):
-		""" based on the protein name, return whether this mutation is synonymous or not """
-		pass
+	def is_synonymous(self,protein_variant_name):
+		""" based on the protein-level variant name, return whether this mutation is synonymous or not """
+		if ('fs' in protein_variant_name) or ('del' in protein_variant_name) or ('ins' in protein_variant_name):
+			return False
+		return True
 
 
 class GisSub(GisVar):
@@ -179,6 +201,10 @@ class GisDel(GisVar):
 		""" make the name of this variant with respect to a viral protein, if the variant is in a protein """
 		protein_name = self._get_protein_name_for_genomic_position(self.genome_start)
 		if protein_name is None:
+			return None
+		## if the variant spance 2 proteins, return None
+		protein_name2 = self._get_protein_name_for_genomic_position(self.genome_end)
+		if protein_name != protein_name2:
 			return None
 		start_codon_number = self._get_codon_number_for_genomic_position(self.genome_start)
 		start_codon_DNA = self._get_protein_codon_DNA_seq(protein_name,start_codon_number)
