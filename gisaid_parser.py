@@ -10,7 +10,7 @@ import math
 
 class GISAID:
 	""" methods to extract individual records from the GISAID website """
-	def __init__(self,headless=True,reverse_record_order=False,record_dir_path="/home/aawan/SHARED/COVID-19/GISAID/records/20200417"):
+	def __init__(self,headless=True,reverse_record_order=False,record_dir_path="/home/aawan/SHARED/COVID-19/GISAID/records/20200419"):
 		self.url = 'https://www.epicov.org/epi3/frontend'
 		self.username = 'rainwala'
 		self.password = 'GuhRsX9o'
@@ -75,7 +75,7 @@ class GISAID:
 		print(f'You entered: {captcha}')
 		input_elems.first.fill(captcha)
 		time.sleep(sleep_time)
-		ok_elem = frame.find_by_value('OK').first
+		ok_elem = frame.find_by_value('Continue').first
 		ok_elem.click()
 		time.sleep(sleep_time)
 		return True
@@ -146,9 +146,9 @@ class GISAID:
 		""" wrapper for the above methods to get parsed output file for each record from the current records page """
 		div_list = self._get_record_div_list_from_current_page(30)
 		print(f'{len(div_list)} new records in this page')
-		self._write_record_from_div_list(div_list,3)
+		self._write_record_from_div_list(div_list,4)
 
-	def _navigate_to_page(self,page_num,wait_time=10):
+	def _navigate_to_page(self,page_num,wait_time=20):
 		""" load the given page of records """
 		try:
 			print(f'trying to go to page {page_num}')

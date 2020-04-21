@@ -3,6 +3,7 @@ from Bio import Seq,SeqIO
 from Bio.SeqUtils import seq3
 import math
 import difflib
+import re
 
 class GisVar:
 	""" parent class for the GisSub, GisDel, and GisIns classes below: 
@@ -60,6 +61,20 @@ class GisVar:
 	def make_protein_variant_name(self):
 		""" make the name of this variant with respect to a viral protein, if the variant is in a protein """
 		pass
+	
+	def is_synonymous(self,protein_variant_name):
+		""" based on the protein-level variant name, return whether this mutation is synonymous or not """
+		if protein_variant_name is None:
+			return True
+		if ('fs' in protein_variant_name) or ('del' in protein_variant_name) or ('ins' in protein_variant_name):
+			return False
+		sub_match = re.search(r':p\.([A-Z][a-z]{2})(\d+)([A-Z][a-z]{2})',protein_variant_name)
+		if sub_match is not None:
+			if sub_match.group(1) == sub_match.group(3):
+				return True
+			else:
+				return False
+		return None
 
 	def _get_protein_name_for_genomic_position(self,genome_position):
 		""" return the name of the protein this genome position falls in, or None """
@@ -149,12 +164,6 @@ class GisVar:
 				name += insertions[pos]
 		return name
 
-	def is_synonymous(self,protein_variant_name):
-		""" based on the protein-level variant name, return whether this mutation is synonymous or not """
-		if ('fs' in protein_variant_name) or ('del' in protein_variant_name) or ('ins' in protein_variant_name):
-			return False
-		return True
-
 
 class GisSub(GisVar):
 	""" methods and data structures to process and represent substitution variants """
@@ -211,7 +220,7 @@ class GisDel(GisVar):
 		start_codon_AA_3letter = seq3(start_codon_DNA.translate())
 		## if the variant is in a coding region and its length is not divisible by 3, return a frameshift name
 		if (len(self.GVCFLine.ref_seq) - 1) % 3 != 0: # keep in mind the ref seq from a VCF always has one extra 3' base
-			return f'{protein_name}:p.({start_codon_AA_3letter}{start_codon_number})fs'
+			return f'{protein_name}:p.({start_codon_AA_3letter}{start_codon_number}fs)'
 		ref_DNA_seq = self._get_ref_DNA_full_codon_seqs_between_two_genome_positions(self.genome_start,self.genome_end)
 		ref_AA_seq = ref_DNA_seq.translate()
 		start_frame = self._get_frame_for_genomic_position(self.genome_start)
@@ -248,7 +257,7 @@ class GisIns(GisVar):
 		start_codon_AA_3letter = seq3(start_codon_DNA.translate())
 		## if the variant is in a coding region and its length is not divisible by 3, return a frameshift name
 		if (len(self.GVCFLine.alt_seq) - 1) % 3 != 0: # keep in mind the ref seq from a VCF always has one extra 3' base
-			return f'{protein_name}:p.({start_codon_AA_3letter}{start_codon_number})fs'
+			return f'{protein_name}:p.({start_codon_AA_3letter}{start_codon_number}fs)'
 		ref_DNA_seq = self._get_ref_DNA_full_codon_seqs_between_two_genome_positions(self.genome_start,self.genome_end + 3)
 		ref_AA_seq = ref_DNA_seq.translate()
 		start_frame = self._get_frame_for_genomic_position(self.genome_start)
