@@ -156,6 +156,8 @@ class TestGisVar:
 	def test_ins_gvcf_make_protein_variant_name(self,ins_gvcf_list,index,expected):
 		assert expected == ins_gvcf_list[index].get_var_type_child().make_protein_variant_name()
 
+	""" tests for all variants """
+
 	@pytest.mark.parametrize("type,index,expected", [
 		('sub',0,True),('sub',1,True),('sub',2,False),
 		('del',0,False),('del',1,False),('del',2,True),('del',3,False),('del',4,False),
@@ -163,3 +165,11 @@ class TestGisVar:
 	])
 	def test_is_synonymous(self,all_gvcf_dict,type,index,expected):
 		assert expected == all_gvcf_dict[type][index].is_synonymous( all_gvcf_dict[type][index].get_var_type_child().make_protein_variant_name() )
+
+	@pytest.mark.parametrize("type,index,expected", [
+		('sub',0,'S'),('sub',1,None),('sub',2,'nsp2'),
+		('del',0,'S'),('del',1,'S'),('del',2,None),('del',3,'ORF7a'),('del',4,'S'),
+		('ins',0,'nsp3'),('ins',1,'S'),('ins',2,None),('ins',3,'S'),
+	])
+	def test_get_protein_name(self,all_gvcf_dict,type,index,expected):
+		assert expected == all_gvcf_dict[type][index].get_protein_name()

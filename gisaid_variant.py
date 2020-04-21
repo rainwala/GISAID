@@ -48,11 +48,11 @@ class GisVar:
 
 	def get_protein_name(self):
 		""" return the name of the protein this variant is found in, or None """
-		start_protein_name = self._get_protein_name_for_genomic_position(self.GVCFLine.pos)
+		start_protein_name = self._get_protein_name_for_genomic_position(self.GVCFLine.get_int_position())
 		if start_protein_name is None:
 			return None
 		end_protein_name = self._get_protein_name_for_genomic_position(
-			self.GVCFLine.pos + max(len(self.GVCFLine.ref_seq), len(self.GVCFLine.alt_seq)) 
+			self.GVCFLine.get_int_position() + max(len(self.GVCFLine.ref_seq), len(self.GVCFLine.alt_seq)) 
 		)
 		if end_protein_name != start_protein_name:
 			return None
